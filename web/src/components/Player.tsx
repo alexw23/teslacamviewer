@@ -10,6 +10,8 @@ const RATES = [0.5, 1, 1.5, 2, 4]
 // Followers are nudged back in line once they drift this far from the main camera.
 const MAX_DRIFT = 0.3
 const CARD_KEY = 'teslacam.driveCard'
+// Top centre of the main picture, where the car's own viewer puts it; smaller on phones.
+const CARD_PLACE = 'absolute top-2 left-1/2 z-10 -translate-x-1/2 origin-top max-sm:scale-75 sm:top-3'
 
 export type PlayerMode = 'cams' | 'grid'
 
@@ -347,6 +349,7 @@ export function Player({ detail, previewJob, onGeneratePreview, range, onRangeCh
                     {isMain ? cameraLabel(camera) : cameraShort(camera)}
                     {camera === detail.triggerCamera && <span className="ml-1.5 text-accent-hover">●</span>}
                   </span>
+                  {isMain && sample && <DriveCard sample={sample} className={CARD_PLACE} />}
                   {!isMain && <span className="pointer-events-none absolute inset-0 ring-1 ring-white/0 transition-all ring-inset group-hover/tile:ring-white/60" />}
                 </div>
               )
@@ -426,7 +429,7 @@ export function Player({ detail, previewJob, onGeneratePreview, range, onRangeCh
             )}
           </div>
         )}
-        {sample && <DriveCard sample={sample} className="absolute top-2 left-2 z-10 origin-top-left max-sm:scale-75 sm:top-3 sm:left-3" />}
+        {sample && mode === 'grid' && <DriveCard sample={sample} className={CARD_PLACE} />}
       </div>
 
       <div className="border-t border-line bg-panel px-3 pt-3 pb-2 sm:px-4">
