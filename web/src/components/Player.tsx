@@ -446,6 +446,13 @@ export function Player({ detail, previewJob, onGeneratePreview, range, onRangeCh
             const at = locate(seconds)
             return formatTime(new Date(parseLocal(segments[at.index].startTime).getTime() + at.local * 1000), true)
           }}
+          previewAt={(seconds) => {
+            const at = locate(seconds)
+            const files = segments[at.index].files
+            const file = files.find((f) => f.camera === main) ?? files.find((f) => f.camera === 'front') ?? files[0]
+            // Quarter seconds are plenty for a thumbnail and spare the browser a seek per pixel.
+            return file?.playable ? { url: file.url, time: Math.round(at.local * 4) / 4 } : null
+          }}
         />
         <div className="mt-1.5 flex flex-wrap items-center gap-x-1 gap-y-2">
           <button onClick={toggle} aria-label={playing ? 'Pause' : 'Play'} className="flex size-10 items-center justify-center rounded-full bg-fg text-ink transition-transform hover:scale-105">
@@ -540,13 +547,30 @@ interface TimelineProps {
   onRangeChange: (range: [number, number] | null) => void
   onSeek: (seconds: number) => void
   timeAt: (seconds: number) => string
+  /** The clip and spot to show when hovering, or null for no picture. */
+  previewAt?: (seconds: number) => { url: string; time: number } | null
 }
 
 /** The scrubber: segment boundaries, the trigger moment, and an optional export range with draggable ends. */
-function TimelineBar({ total, position, offsets, trigger, assisted, range, onRangeChange, onSeek, timeAt }: TimelineProps) {
+function TimelineBar({ total, position, offsets, trigger, assisted, range, onRangeChange, onSeek, timeAt, previewAt }: TimelineProps) {
   const track = useRef<HTMLDivElement>(null)
   const [hover, setHover] = useState<number | null>(null)
   const dragging = useRef<'seek' | 'start' | 'end' | null>(null)
+  const thumb = useRef<HTMLVideoElement>(null)
+  // The spot the thumbnail should show; applied once any seek already under way has finished.
+  const wanted = useRef<number | null>(null)
+  const preview = hover != null && previewAt ? previewAt(hover) : null
+
+  const showWanted = useCallback(() => {
+    const v = thumb.current
+    if (!v || wanted.current == null || v.readyState < 1 || v.seeking) return
+    if (Math.abs(v.currentTime - wanted.current) > 0.05) v.currentTime = wanted.current
+  }, [])
+
+  useEffect(() => {
+    wanted.current = preview?.time ?? null
+    showWanted()
+  }, [preview?.url, preview?.time, showWanted])
 
   const toSeconds = (clientX: number) => {
     const rect = track.current!.getBoundingClientRect()
@@ -632,8 +656,26 @@ function TimelineBar({ total, position, offsets, trigger, assisted, range, onRan
         />
       </div>
       {hover != null && (
-        <div className="tabular pointer-events-none absolute -top-7 -translate-x-1/2 rounded bg-raised px-1.5 py-0.5 text-[11px] font-medium whitespace-nowrap shadow" style={{ left: pct(hover) }}>
-          {formatClock(hover)} · {timeAt(hover)}
+        <div
+          className="pointer-events-none absolute bottom-full mb-1 -translate-x-1/2"
+          // Keep a thumbnail-wide tooltip inside the track at both ends.
+          style={{ left: preview ? `clamp(5.5rem, ${pct(hover)}, calc(100% - 5.5rem))` : pct(hover) }}
+        >
+          {preview && (
+            <video
+              ref={thumb}
+              src={preview.url}
+              muted
+              playsInline
+              preload="metadata"
+              onLoadedMetadata={showWanted}
+              onSeeked={showWanted}
+              className="mb-1 aspect-4/3 w-44 rounded-md border border-line bg-black object-cover shadow-lg"
+            />
+          )}
+          <div className="tabular mx-auto w-fit rounded bg-raised px-1.5 py-0.5 text-[11px] font-medium whitespace-nowrap shadow">
+            {formatClock(hover)} · {timeAt(hover)}
+          </div>
         </div>
       )}
     </div>
