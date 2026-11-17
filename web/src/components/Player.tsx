@@ -11,6 +11,23 @@ const RATES = [0.5, 1, 1.5, 2, 4]
 const MAX_DRIFT = 0.3
 const CARD_KEY = 'teslacam.driveCard'
 // Top centre of the main picture, where the car's own viewer puts it; smaller on phones.
+/** Safari keeps fetching a removed video (and retries a 404 for ever) until its source is cleared. */
+function release(v: HTMLVideoElement) {
+  v.removeAttribute('src')
+  v.load()
+}
+
+/** A ref callback that releases the element when React lets go of it; must stay the same function between renders. */
+function releasingRef(set: (el: HTMLVideoElement | null) => void) {
+  return (el: HTMLVideoElement | null) => {
+    set(el)
+    return () => {
+      if (el) release(el)
+      set(null)
+    }
+  }
+}
+
 const CARD_PLACE = 'absolute top-2 left-1/2 z-10 -translate-x-1/2 origin-top max-sm:scale-75 sm:top-3'
 
 export type PlayerMode = 'cams' | 'grid'
@@ -79,6 +96,17 @@ export function Player({ detail, previewJob, onGeneratePreview, range, onRangeCh
   const container = useRef<HTMLDivElement>(null)
   const videos = useRef<Record<string, HTMLVideoElement | null>>({})
   const gridVideo = useRef<HTMLVideoElement | null>(null)
+  const [gridRef] = useState(() => releasingRef((el) => (gridVideo.current = el)))
+  // One stable ref per camera, so React only runs the cleanup when a video element really goes away.
+  const cameraRefs = useRef(new Map<string, ReturnType<typeof releasingRef>>())
+  const cameraRef = (camera: string) => {
+    let r = cameraRefs.current.get(camera)
+    if (!r) {
+      r = releasingRef((el) => (videos.current[camera] = el))
+      cameraRefs.current.set(camera, r)
+    }
+    return r
+  }
   // Where freshly loaded videos should start; tagged so a stale request is never applied to another segment.
   const pending = useRef<{ seg: number; time: number } | null>(initial.global > 0 ? { seg: initial.index, time: initial.local } : null)
   const playingRef = useRef(false)
@@ -320,9 +348,7 @@ export function Player({ detail, previewJob, onGeneratePreview, range, onRangeCh
                   {file && !broken ? (
                     <video
                       key={file.id}
-                      ref={(el) => {
-                        videos.current[camera] = el
-                      }}
+                      ref={cameraRef(camera)}
                       src={file.url}
                       muted
                       playsInline
@@ -367,7 +393,7 @@ export function Player({ detail, previewJob, onGeneratePreview, range, onRangeCh
           >
             <video
               key={preview.url}
-              ref={gridVideo}
+              ref={gridRef}
               src={preview.url}
               muted
               playsInline
@@ -556,7 +582,9 @@ function TimelineBar({ total, position, offsets, trigger, assisted, range, onRan
   const track = useRef<HTMLDivElement>(null)
   const [hover, setHover] = useState<number | null>(null)
   const dragging = useRef<'seek' | 'start' | 'end' | null>(null)
-  const thumb = useRef<HTMLVideoElement>(null)
+  // A plain holder rather than a ref: it is only read in callbacks, and the ref callback below fills it.
+  const [thumb] = useState(() => ({ current: null as HTMLVideoElement | null }))
+  const [thumbRef] = useState(() => releasingRef((el) => (thumb.current = el)))
   // The spot the thumbnail should show; applied once any seek already under way has finished.
   const wanted = useRef<number | null>(null)
   const preview = hover != null && previewAt ? previewAt(hover) : null
@@ -663,7 +691,7 @@ function TimelineBar({ total, position, offsets, trigger, assisted, range, onRan
         >
           {preview && (
             <video
-              ref={thumb}
+              ref={thumbRef}
               src={preview.url}
               muted
               playsInline

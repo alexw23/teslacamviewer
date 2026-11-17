@@ -29,8 +29,6 @@ export default function EventPage() {
   // The player's position, a few times a second; enough for the map and chart beside it.
   const [position, setPosition] = useState(0)
   const [seekRequest, setSeekRequest] = useState<{ at: number; key: number } | null>(null)
-  const telemetry = useQuery({ queryKey: ['telemetry', id], queryFn: () => api.telemetry(id), staleTime: Infinity })
-  const hasTelemetry = !!telemetry.data && telemetry.data.t.length > 0
 
   const query = useQuery({
     queryKey: ['event', id],
@@ -39,6 +37,10 @@ export default function EventPage() {
     refetchInterval: (q) => (q.state.data && [...q.state.data.jobs, ...q.state.data.exports].some(isActive) ? 1500 : false),
   })
   const detail = query.data
+  // Keyed on the segments too, so a trim or keep-only fetches the new timeline.
+  const segmentKey = query.data?.segments.map((s) => s.id).join(',') ?? ''
+  const telemetry = useQuery({ queryKey: ['telemetry', id, segmentKey], queryFn: () => api.telemetry(id), staleTime: Infinity, enabled: !!segmentKey })
+  const hasTelemetry = !!telemetry.data && telemetry.data.t.length > 0
 
   useEffect(() => {
     setRange(null)
@@ -107,7 +109,8 @@ export default function EventPage() {
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="min-w-0 space-y-4">
           <Player
-            key={id}
+            // A new set of segments (after keep-only, trim or deleting one) starts the player afresh.
+            key={`${id}:${segmentKey}`}
             detail={detail}
             previewJob={previewJob}
             onGeneratePreview={() => run(() => api.process(id, 'preview'))}
