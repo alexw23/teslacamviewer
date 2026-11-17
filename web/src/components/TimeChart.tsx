@@ -22,6 +22,7 @@ export function TimeChart({
   onHover,
   format,
   ticks,
+  bands,
   className,
 }: {
   title: string
@@ -33,6 +34,8 @@ export function TimeChart({
   format: (v: number) => string
   /** Gridline values, which also set the scale; the chart grows to fit values beyond them. */
   ticks: number[]
+  /** Stretches of time to shade behind the line, such as when Autopilot was on. */
+  bands?: [number, number][]
   className?: string
 }) {
   const clip = useId()
@@ -92,6 +95,9 @@ export function TimeChart({
                 <rect x={0} y={zero} width={100} height={100 - zero} />
               </clipPath>
             </defs>
+            {bands?.map(([a, b]) => (
+              <rect key={a} x={x(a)} y={0} width={Math.max(0.3, x(b) - x(a))} height={100} fill="var(--color-blue)" fillOpacity={0.14} />
+            ))}
             {ticks.map((v) => (
               <line key={v} x1={0} x2={100} y1={y(v)} y2={y(v)} stroke="var(--color-line)" strokeWidth={1} vectorEffect="non-scaling-stroke" />
             ))}

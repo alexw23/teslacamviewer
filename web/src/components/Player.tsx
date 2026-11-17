@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { AlertTriangle, Crosshair, Gauge, LayoutGrid, Maximize, Minimize, Pause, Play, RotateCcw, RotateCw, Scissors, VideoOff } from 'lucide-react'
 import type { EventDetail, Job, Telemetry } from '../api'
-import { sampleAt } from '../lib/telemetry'
+import { assistedRuns, sampleAt } from '../lib/telemetry'
 import { DriveCard } from './DriveCard'
 import { cameraLabel, cameraShort, cx, formatClock, formatTime, parseLocal } from '../lib/format'
 import { Button, Menu, MenuItem, ProgressBar, Segmented } from './ui'
@@ -271,6 +271,7 @@ export function Player({ detail, previewJob, onGeneratePreview, range, onRangeCh
   const gridLayout = preview ? parseLayout(preview.layout) : null
   const hasTelemetry = !!telemetry && telemetry.t.length > 0
   const sample = hasTelemetry && showCard ? sampleAt(telemetry!, position) : null
+  const assisted = useMemo(() => (telemetry ? assistedRuns(telemetry) : []), [telemetry])
 
   function toggleCard() {
     setShowCard((on) => {
@@ -434,6 +435,7 @@ export function Player({ detail, previewJob, onGeneratePreview, range, onRangeCh
           position={position}
           offsets={offsets}
           trigger={detail.triggerOffsetSec}
+          assisted={assisted}
           range={range}
           onRangeChange={onRangeChange}
           onSeek={seek}
@@ -529,6 +531,8 @@ interface TimelineProps {
   position: number
   offsets: number[]
   trigger: number | null
+  /** Where Autopilot was engaged, drawn as a blue line under the track. */
+  assisted: [number, number][]
   range: [number, number] | null
   onRangeChange: (range: [number, number] | null) => void
   onSeek: (seconds: number) => void
@@ -536,7 +540,7 @@ interface TimelineProps {
 }
 
 /** The scrubber: segment boundaries, the trigger moment, and an optional export range with draggable ends. */
-function TimelineBar({ total, position, offsets, trigger, range, onRangeChange, onSeek, timeAt }: TimelineProps) {
+function TimelineBar({ total, position, offsets, trigger, assisted, range, onRangeChange, onSeek, timeAt }: TimelineProps) {
   const track = useRef<HTMLDivElement>(null)
   const [hover, setHover] = useState<number | null>(null)
   const dragging = useRef<'seek' | 'start' | 'end' | null>(null)
@@ -592,6 +596,9 @@ function TimelineBar({ total, position, offsets, trigger, range, onRangeChange, 
     >
       <div ref={track} className="relative h-1.5 w-full rounded-full bg-line-strong transition-[height] group-hover/timeline:h-2">
         <div className="absolute inset-y-0 left-0 rounded-full bg-fg" style={{ width: pct(position) }} />
+        {assisted.map(([a, b]) => (
+          <span key={a} className="absolute top-full mt-1 h-0.5 rounded-full bg-blue" style={{ left: pct(a), width: pct(b - a) }} title="Autopilot" />
+        ))}
         {offsets.slice(1).map((o) => (
           <span key={o} className="absolute inset-y-0 w-0.5 -translate-x-1/2 bg-ink" style={{ left: pct(o) }} />
         ))}

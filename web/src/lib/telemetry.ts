@@ -91,3 +91,15 @@ export function forwardG(tel: Telemetry, i: number, every = 1): number {
   for (let k = i; k < end; k++) sum += tel.accelY[k]
   return -sum / Math.max(1, end - i) / 9.80665
 }
+
+/** Stretches where Autopilot (any mode) was engaged, as [start, end] seconds; gaps under two seconds are bridged. */
+export function assistedRuns(tel: Telemetry): [number, number][] {
+  const runs: [number, number][] = []
+  for (let i = 0; i < tel.t.length; i++) {
+    if (!tel.autopilot[i]) continue
+    const last = runs[runs.length - 1]
+    if (last && tel.t[i] - last[1] < 2) last[1] = tel.t[i]
+    else runs.push([tel.t[i], tel.t[i]])
+  }
+  return runs.filter(([a, b]) => b - a >= 1)
+}

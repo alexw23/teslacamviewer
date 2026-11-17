@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { Telemetry } from '../api'
 import { formatSpeed, formatTripDistance, speedUnit, speedValue } from '../lib/format'
-import { MPS_TO_MPH, forwardG, routeMetres, routeOf, sampleAt } from '../lib/telemetry'
+import { MPS_TO_MPH, assistedRuns, forwardG, routeMetres, routeOf, sampleAt } from '../lib/telemetry'
 import { RouteMap } from './RouteMap'
 import { TimeChart } from './TimeChart'
 import { Card, Segmented } from './ui'
@@ -26,7 +26,7 @@ export function TelemetryPanel({ telemetry, position, total, onSeek }: { telemet
     const metres = routeMetres(route)
     const topMph = Math.max(0, ...telemetry.speedMps.map((v) => Math.abs(v) * MPS_TO_MPH))
     const assisted = telemetry.autopilot.filter((a) => a > 0).length / Math.max(1, telemetry.autopilot.length)
-    return { route, speed, g, miles: metres / 1609.344, topMph, assisted }
+    return { route, speed, g, miles: metres / 1609.344, topMph, assisted, runs: assistedRuns(telemetry) }
   }, [telemetry])
 
   const at = sampleAt(telemetry, hover ?? position)
@@ -65,8 +65,14 @@ export function TelemetryPanel({ telemetry, position, total, onSeek }: { telemet
                 onHover={setHover}
                 format={(v) => (metric === 'speed' ? `${Math.round(v)}` : v.toFixed(1))}
                 ticks={ticks}
+                bands={data.runs}
               />
             </div>
+            {data.runs.length > 0 && (
+              <p className="flex items-center gap-1.5 text-[11px] text-faint">
+                <span className="inline-block size-2.5 rounded-sm bg-blue/40" /> Autopilot or FSD engaged
+              </p>
+            )}
           </>
         )}
       </div>
