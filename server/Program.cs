@@ -32,6 +32,7 @@ builder.Services.AddSingleton<Scanner>();
 builder.Services.AddSingleton<JobRunner>();
 builder.Services.AddSingleton<TrashService>();
 builder.Services.AddSingleton<RangeKeeper>();
+builder.Services.AddSingleton<TelemetryService>();
 builder.Services.AddSingleton<CarLogService>();
 builder.Services.AddSingleton<ArchiverService>();
 builder.Services.AddSingleton<ImportService>();

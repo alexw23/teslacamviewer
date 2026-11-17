@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
-import { AlertTriangle, Crosshair, LayoutGrid, Maximize, Minimize, Pause, Play, RotateCcw, RotateCw, Scissors, VideoOff } from 'lucide-react'
-import type { EventDetail, Job } from '../api'
+import { AlertTriangle, Crosshair, Gauge, LayoutGrid, Maximize, Minimize, Pause, Play, RotateCcw, RotateCw, Scissors, VideoOff } from 'lucide-react'
+import type { EventDetail, Job, Telemetry } from '../api'
+import { sampleAt } from '../lib/telemetry'
+import { DriveCard } from './DriveCard'
 import { cameraLabel, cameraShort, cx, formatClock, formatTime, parseLocal } from '../lib/format'
 import { Button, Menu, MenuItem, ProgressBar, Segmented } from './ui'
 
 const RATES = [0.5, 1, 1.5, 2, 4]
 // Followers are nudged back in line once they drift this far from the main camera.
 const MAX_DRIFT = 0.3
+const CARD_KEY = 'teslacam.driveCard'
 
 export type PlayerMode = 'cams' | 'grid'
 
@@ -18,13 +21,17 @@ interface Props {
   range: [number, number] | null
   onRangeChange: (range: [number, number] | null) => void
   onPosition?: (seconds: number) => void
+  /** The car's telemetry along the event, when its clips carry any. */
+  telemetry?: Telemetry | null
+  /** Seeks when it changes; the key lets the same spot be asked for twice. */
+  seekRequest?: { at: number; key: number } | null
 }
 
 /**
  * Plays an event as one continuous timeline. In camera mode every camera has its own video element,
  * kept in step with the main one; in grid mode a single pre-merged video is used instead.
  */
-export function Player({ detail, previewJob, onGeneratePreview, range, onRangeChange, onPosition }: Props) {
+export function Player({ detail, previewJob, onGeneratePreview, range, onRangeChange, onPosition, telemetry, seekRequest }: Props) {
   const { segments, summary, preview } = detail
   const cameras = summary.cameras
   const offsets = useMemo(() => {
@@ -59,6 +66,13 @@ export function Player({ detail, previewJob, onGeneratePreview, range, onRangeCh
   const [rate, setRate] = useState(1)
   const [fullscreen, setFullscreen] = useState(false)
   const [failed, setFailed] = useState<Set<number>>(new Set())
+  const [showCard, setShowCard] = useState(() => {
+    try {
+      return localStorage.getItem(CARD_KEY) !== 'off'
+    } catch {
+      return true
+    }
+  })
 
   const container = useRef<HTMLDivElement>(null)
   const videos = useRef<Record<string, HTMLVideoElement | null>>({})
@@ -118,6 +132,12 @@ export function Player({ detail, previewJob, onGeneratePreview, range, onRangeCh
     },
     [locate, mode, segIndex, updatePosition],
   )
+
+  useEffect(() => {
+    if (seekRequest) seek(seekRequest.at)
+    // Only a new request should seek, not a new seek function.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seekRequest])
 
   const playAll = useCallback(() => {
     if (mode === 'grid') gridVideo.current?.play().catch(() => {})
@@ -249,6 +269,19 @@ export function Player({ detail, previewJob, onGeneratePreview, range, onRangeCh
   const others = cameras.filter((c) => c !== main)
   const wide = others.length > 3
   const gridLayout = preview ? parseLayout(preview.layout) : null
+  const hasTelemetry = !!telemetry && telemetry.t.length > 0
+  const sample = hasTelemetry && showCard ? sampleAt(telemetry!, position) : null
+
+  function toggleCard() {
+    setShowCard((on) => {
+      try {
+        localStorage.setItem(CARD_KEY, on ? 'off' : 'on')
+      } catch {
+        // Private mode: the choice just isn't remembered.
+      }
+      return !on
+    })
+  }
 
   return (
     <div ref={container} className={cx('flex flex-col bg-black', fullscreen ? 'h-full' : 'overflow-hidden rounded-card border border-line')}>
@@ -392,6 +425,7 @@ export function Player({ detail, previewJob, onGeneratePreview, range, onRangeCh
             )}
           </div>
         )}
+        {sample && <DriveCard sample={sample} className="absolute top-2 left-2 z-10 origin-top-left max-sm:scale-75 sm:top-3 sm:left-3" />}
       </div>
 
       <div className="border-t border-line bg-panel px-3 pt-3 pb-2 sm:px-4">
@@ -425,6 +459,11 @@ export function Player({ detail, previewJob, onGeneratePreview, range, onRangeCh
           </div>
 
           <div className="ml-auto flex items-center gap-1">
+            {hasTelemetry && (
+              <ControlButton label={showCard ? 'Hide speed and controls' : 'Show speed and controls'} active={showCard} onClick={toggleCard}>
+                <Gauge className="size-[18px]" />
+              </ControlButton>
+            )}
             {detail.triggerOffsetSec != null && (
               <ControlButton label="Jump to the trigger (T)" onClick={() => seek(Math.max(0, detail.triggerOffsetSec! - 3))}>
                 <Crosshair className="size-[18px] text-accent-hover" />

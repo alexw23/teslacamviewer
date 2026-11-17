@@ -12,6 +12,7 @@ import {
 import { Badge, Button, Card, ConfirmDialog, EmptyState, IconButton, Menu, MenuItem, ProgressBar, Spinner, inputClass } from '../components/ui'
 import { Player } from '../components/Player'
 import { MiniMap } from '../components/MiniMap'
+import { TelemetryPanel } from '../components/TelemetryPanel'
 import { CollectionPicker } from '../components/CollectionPicker'
 
 const isActive = (job?: Job) => job?.status === 'queued' || job?.status === 'running'
@@ -25,6 +26,11 @@ export default function EventPage() {
   const [dialog, setDialog] = useState<'collect' | 'trim' | 'trash' | 'keep' | { segment: number } | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  // The player's position, a few times a second; enough for the map and chart beside it.
+  const [position, setPosition] = useState(0)
+  const [seekRequest, setSeekRequest] = useState<{ at: number; key: number } | null>(null)
+  const telemetry = useQuery({ queryKey: ['telemetry', id], queryFn: () => api.telemetry(id), staleTime: Infinity })
+  const hasTelemetry = !!telemetry.data && telemetry.data.t.length > 0
 
   const query = useQuery({
     queryKey: ['event', id],
@@ -36,6 +42,7 @@ export default function EventPage() {
 
   useEffect(() => {
     setRange(null)
+    setPosition(0)
     setActionError(null)
     setNotice(null)
   }, [id])
@@ -106,6 +113,9 @@ export default function EventPage() {
             onGeneratePreview={() => run(() => api.process(id, 'preview'))}
             range={range}
             onRangeChange={setRange}
+            telemetry={telemetry.data}
+            onPosition={(seconds) => setPosition((p) => (Math.abs(p - seconds) >= 0.25 ? seconds : p))}
+            seekRequest={seekRequest}
           />
 
           {unplayable.length > 0 && (
@@ -307,9 +317,18 @@ export default function EventPage() {
             </Card>
           )}
 
+          {hasTelemetry && (
+            <TelemetryPanel
+              telemetry={telemetry.data!}
+              position={position}
+              total={detail.segments.reduce((sum, s) => sum + s.durationSec, 0)}
+              onSeek={(at) => setSeekRequest({ at, key: Date.now() })}
+            />
+          )}
+
           {summary.lat != null && summary.lon != null && (
             <Card className="overflow-hidden">
-              <MiniMap lat={summary.lat} lon={summary.lon} className="h-44 w-full" />
+              {!hasTelemetry && <MiniMap lat={summary.lat} lon={summary.lon} className="h-44 w-full" />}
               <div className="flex items-center justify-between gap-3 px-4 py-3">
                 <p className="flex min-w-0 items-center gap-1.5 text-sm">
                   <MapPin className="size-4 shrink-0 text-accent-hover" />

@@ -502,6 +502,27 @@ function query(params: object): string {
   return s ? `?${s}` : ''
 }
 
+/** An event's telemetry, column by column; t is seconds from the start of the event. Empty when the clips carry none. */
+export interface Telemetry {
+  hz: number
+  t: number[]
+  speedMps: number[]
+  /** 0 Park, 1 Drive, 2 Reverse, 3 Neutral. */
+  gear: number[]
+  steeringDeg: number[]
+  accelerator: number[]
+  brake: boolean[]
+  /** 0 none, 1 FSD, 2 Autosteer, 3 TACC. */
+  autopilot: number[]
+  blinkerLeft: boolean[]
+  blinkerRight: boolean[]
+  lat: (number | null)[]
+  lon: (number | null)[]
+  heading: number[]
+  accelX: number[]
+  accelY: number[]
+}
+
 export const api = {
   authStatus: () => request<AuthStatus>('GET', '/api/auth/status'),
   setup: (password: string) => request<void>('POST', '/api/auth/setup', { password }),
@@ -515,6 +536,7 @@ export const api = {
   facets: () => request<Facets>('GET', '/api/events/facets'),
   mapPoints: (filters: EventFilters) => request<MapPoint[]>('GET', `/api/events/map${query(filters)}`),
   event: (id: number) => request<EventDetail>('GET', `/api/events/${id}`),
+  telemetry: (id: number) => request<Telemetry>('GET', `/api/events/${id}/telemetry`),
   patchEvent: (id: number, patch: { favorite?: boolean; notes?: string }) =>
     request<EventSummary>('PATCH', `/api/events/${id}`, patch),
   trashEvent: (id: number) => request<void>('DELETE', `/api/events/${id}`),

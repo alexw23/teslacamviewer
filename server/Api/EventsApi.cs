@@ -141,6 +141,16 @@ public static class EventsApi
             });
         });
 
+        // The car's speed, controls and position along the event, read from the clips on first request and cached.
+        group.MapGet("/{id:int}/telemetry", async (int id, AppDb db, TelemetryService telemetry, CancellationToken ct) =>
+        {
+            var ev = await db.Events.AsNoTracking()
+                .Include(e => e.Segments).ThenInclude(s => s.Files)
+                .AsSplitQuery()
+                .FirstOrDefaultAsync(e => e.Id == id, ct);
+            return ev == null ? Results.NotFound() : Results.Ok(await telemetry.GetAsync(ev, ct));
+        });
+
         group.MapPatch("/{id:int}", async (int id, PatchEvent patch, AppDb db) =>
         {
             var ev = await db.Events.FirstOrDefaultAsync(e => e.Id == id);
