@@ -96,7 +96,13 @@ export function Player({ detail, previewJob, onGeneratePreview, range, onRangeCh
   const container = useRef<HTMLDivElement>(null)
   const videos = useRef<Record<string, HTMLVideoElement | null>>({})
   const gridVideo = useRef<HTMLVideoElement | null>(null)
-  const [gridRef] = useState(() => releasingRef((el) => (gridVideo.current = el)))
+  const gridRef = useCallback((el: HTMLVideoElement | null) => {
+    gridVideo.current = el
+    return () => {
+      if (el) release(el)
+      gridVideo.current = null
+    }
+  }, [])
   // One stable ref per camera, so React only runs the cleanup when a video element really goes away.
   const cameraRefs = useRef(new Map<string, ReturnType<typeof releasingRef>>())
   const cameraRef = (camera: string) => {
@@ -582,9 +588,14 @@ function TimelineBar({ total, position, offsets, trigger, assisted, range, onRan
   const track = useRef<HTMLDivElement>(null)
   const [hover, setHover] = useState<number | null>(null)
   const dragging = useRef<'seek' | 'start' | 'end' | null>(null)
-  // A plain holder rather than a ref: it is only read in callbacks, and the ref callback below fills it.
-  const [thumb] = useState(() => ({ current: null as HTMLVideoElement | null }))
-  const [thumbRef] = useState(() => releasingRef((el) => (thumb.current = el)))
+  const thumb = useRef<HTMLVideoElement | null>(null)
+  const thumbRef = useCallback((el: HTMLVideoElement | null) => {
+    thumb.current = el
+    return () => {
+      if (el) release(el)
+      thumb.current = null
+    }
+  }, [])
   // The spot the thumbnail should show; applied once any seek already under way has finished.
   const wanted = useRef<number | null>(null)
   const preview = hover != null && previewAt ? previewAt(hover) : null
