@@ -119,9 +119,21 @@ input[type='date']::-webkit-calendar-picker-indicator {
   animation: rise 0.25s ease-out both;
 }
 
+/* An indicator lamp: hard on/off, about 85 flashes a minute like a car's. */
+@keyframes blink {
+  50% {
+    opacity: 0.12;
+  }
+}
+
+.blink {
+  animation: blink 0.7s steps(1, end) infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .skeleton,
-  .rise {
+  .rise,
+  .blink {
     animation: none;
   }
 }

@@ -46,7 +46,7 @@ export function DriveCard({ sample, className }: { sample: Sample; className?: s
 /** A solid indicator arrow: bright green when on, a faint outline when off. */
 function Arrow({ side, on }: { side: 'left' | 'right'; on: boolean }) {
   return (
-    <svg viewBox="0 0 12 12" className={cx('size-4 shrink-0', on ? 'text-ok drop-shadow-[0_0_4px_rgb(48_209_88/0.8)]' : 'text-white/15')} aria-label={on ? `${side} indicator on` : undefined}>
+    <svg viewBox="0 0 12 12" className={cx('size-4 shrink-0', on ? 'blink text-ok drop-shadow-[0_0_4px_rgb(48_209_88/0.8)]' : 'text-white/15')} aria-label={on ? `${side} indicator on` : undefined}>
       <path d={side === 'left' ? 'M1 6 7 1v3h4v4H7v3z' : 'M11 6 5 1v3H1v4h4v3z'} fill="currentColor" />
     </svg>
   )
