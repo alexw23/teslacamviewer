@@ -79,3 +79,15 @@ export function routeMetres(route: [number, number][]): number {
   }
   return total
 }
+
+/**
+ * Forward acceleration in g, positive when speeding up, averaged over `every` samples to calm sensor noise.
+ * dashcam.proto doesn't name the axes; on real drives the change in speed follows -y (r ≈ 0.8) and not x,
+ * so y is the car's long axis pointing backwards and x is sideways.
+ */
+export function forwardG(tel: Telemetry, i: number, every = 1): number {
+  const end = Math.min(tel.accelY.length, i + every)
+  let sum = 0
+  for (let k = i; k < end; k++) sum += tel.accelY[k]
+  return -sum / Math.max(1, end - i) / 9.80665
+}
